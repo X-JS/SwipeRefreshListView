@@ -1,15 +1,27 @@
 package com.oyty.refreshlistview;
 
-import com.oyty.refreshlistview.ILoadingLayout.State;
-import com.oyty.swipelistview.SwipeMenuListView;
-
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.View;
 import android.widget.AbsListView;
 import android.widget.AbsListView.OnScrollListener;
 import android.widget.Adapter;
+import android.widget.AdapterView;
+import android.widget.ListAdapter;
 import android.widget.ListView;
+
+import com.oyty.refreshlistview.ILoadingLayout.State;
+import com.oyty.swipelistview.SwipeMenu;
+import com.oyty.swipelistview.SwipeMenuCreator;
+import com.oyty.swipelistview.SwipeMenuItem;
+import com.oyty.swipelistview.SwipeMenuListView;
+import com.oyty.swiperefreshlistview.R;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * 这个类实现了ListView下拉刷新，上加载更多和滑到底部自动加载
@@ -22,6 +34,21 @@ public class PullToRefreshListView extends PullToRefreshBase<SwipeMenuListView> 
     private LoadingLayout mLoadMoreFooterLayout;
     /**滚动的监听器*/
     private OnScrollListener mScrollListener;
+
+    private SwipeMenuListView listView;
+
+    private SwipeMenuCreator creator;
+
+    /**
+     * 只有下拉刷新，上拉加载更多功能
+     * 只有侧滑删除功能
+     * 都有
+     */
+    public enum FunctionConfig {
+        REFRESH, SWIPE, ALL
+    }
+
+    private FunctionConfig config = FunctionConfig.ALL;
     
     /**
      * 构造方法
@@ -53,6 +80,160 @@ public class PullToRefreshListView extends PullToRefreshBase<SwipeMenuListView> 
         super(context, attrs);
         
         setPullLoadEnabled(false);
+    }
+
+    /**
+     * 初始化SwipeRefreshListView
+     */
+    public void init(Context context) {
+        listView = getRefreshableView();
+        initView(context);
+    }
+
+    public void setAdapter(ListAdapter adapter) {
+        listView.setAdapter(adapter);
+    }
+
+    /**
+     * 设置功能范围
+     * @param config
+     */
+    public void setFunctionConfig(FunctionConfig config) {
+        if(config != null) {
+            this.config = config;
+        }
+        if(config == FunctionConfig.REFRESH) {
+            listView.setMenuCreator(null);
+        } else if(config == FunctionConfig.SWIPE) {
+            listView.setMenuCreator(creator);
+            setPullRefreshEnabled(false);
+            setPullLoadEnabled(false);
+        } else {
+            listView.setMenuCreator(creator);
+        }
+    }
+
+    private void initView(Context context) {
+        // 1-设置上拉加载不可用（国内一般是滚动到最后一个条目，加载更多）
+        setPullLoadEnabled(true);
+        // 2-滑动到底部是否自动加载更多数据
+        setScrollLoadEnabled(false);
+        // 8-设置最后更新的时间文本
+        setLastUpdatedLabel(getStringDate());
+
+        initSwipeMenu(context);
+    }
+
+    /**
+     * 设置listview的条目点击事件
+     * @param listener
+     */
+    public void setOnItemClickListener(AdapterView.OnItemClickListener listener) {
+        listView.setOnItemClickListener(listener);
+    }
+
+    private void initSwipeMenu(final Context context){
+        // step 1. create a MenuCreator
+        creator = new SwipeMenuCreator() {
+
+            @Override
+            public void create(SwipeMenu menu) {
+                // create "open" item
+                /*SwipeMenuItem openItem = new SwipeMenuItem(
+                        context);
+                // set item background
+                openItem.setBackground(new ColorDrawable(Color.rgb(0xC9, 0xC9,
+                        0xCE)));
+                // set item width
+                openItem.setWidth(dp2px(90));
+                // set item title
+                openItem.setTitle("Open");
+                // set item title fontsize
+                openItem.setTitleSize(18);
+                // set item title font color
+                openItem.setTitleColor(Color.WHITE);
+                // add to menu
+                menu.addMenuItem(openItem);*/
+
+
+                // create "delete" item
+                SwipeMenuItem deleteItem = new SwipeMenuItem(
+                        context);
+                // set item background
+                deleteItem.setBackground(new ColorDrawable(Color.rgb(0xF9,
+                        0x3F, 0x25)));
+                // set item width
+                deleteItem.setWidth(dp2px(90));
+                // set a icon
+                deleteItem.setIcon(R.drawable.ic_delete);
+                // add to menu
+                menu.addMenuItem(deleteItem);
+            }
+        };
+        // set creator
+
+
+//        // set SwipeListener
+//        mListView.setOnSwipeListener(new SwipeMenuListView.OnSwipeListener() {
+//
+//            @Override
+//            public void onSwipeStart(int position) {
+//                // swipe start
+//            }
+//
+//            @Override
+//            public void onSwipeEnd(int position) {
+//                // swipe end
+//            }
+//        });
+
+        // other setting
+        // listView.setCloseInterpolator(new BounceInterpolator());
+
+        // test item long click
+//        mListView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+//
+//            @Override
+//            public boolean onItemLongClick(AdapterView<?> parent, View view,
+//                                           int position, long id) {
+//                Toast.makeText(getApplicationContext(),
+//                        position + " long click", 0).show();
+//                return false;
+//            }
+//        });
+    }
+
+    private int dp2px(int dp) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp,
+                getResources().getDisplayMetrics());
+    }
+
+    /**
+     * 设置menu点击事件
+     * @param listener
+     */
+    public void setOnMenuItemClickListener(SwipeMenuListView.OnMenuItemClickListener listener) {
+        listView.setOnMenuItemClickListener(listener);
+    }
+
+    public void setOnRefreshComplete() {
+        //7-设置下拉刷新和滚动加载更多完成的
+        onPullDownRefreshComplete();
+        onPullUpRefreshComplete();
+        setLastUpdatedLabel(getStringDate());
+    }
+
+
+    /**
+     * 获取现在时间
+     *
+     * @return 返回短时间字符串格式yyyy-MM-dd HH:mm:ss
+     */
+    public static String getStringDate() {
+        Date currentTime = new Date();
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        String dateString = formatter.format(currentTime);
+        return dateString;
     }
 
     @Override
